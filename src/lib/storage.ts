@@ -2,26 +2,35 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Audio storage. Vercel Blob when BLOB_READ_WRITE_TOKEN is set (attach a Blob
- * store in the Vercel dashboard); the local filesystem for `npm run dev`.
+ * Audio storage. Vercel Blob when a store is attached; the local filesystem
+ * for `npm run dev`.
+ *
+ * Blob auth comes in two flavours and the SDK resolves both from env:
+ *  - OIDC (current default when you attach a store): BLOB_STORE_ID + the
+ *    identity token Vercel injects into every function invocation.
+ *  - Legacy read-write token: BLOB_READ_WRITE_TOKEN.
  *
  * Returns null when there is nowhere durable to put the file (e.g. Vercel
  * without a Blob store — its filesystem is read-only). The log is still saved;
  * it just won't have playback.
  */
+export function hasBlobStore() {
+  return !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
+
 export async function storeAudio(buf: Buffer, mime: string): Promise<string | null> {
   const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : mime.includes("wav") ? "wav" : "webm";
   const name = `recordings/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   try {
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (hasBlobStore()) {
       const { put } = await import("@vercel/blob");
       const blob = await put(name, buf, { access: "public", contentType: mime, addRandomSuffix: false });
       return blob.url;
     }
 
     if (process.env.VERCEL) {
-      console.warn("storeAudio: no BLOB_READ_WRITE_TOKEN on Vercel — skipping audio upload");
+      console.warn("storeAudio: no Blob store attached (BLOB_STORE_ID / BLOB_READ_WRITE_TOKEN) — skipping audio upload");
       return null;
     }
 

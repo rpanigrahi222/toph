@@ -486,7 +486,7 @@ export function Recorder({ workers }: { workers: User[] }) {
             ) : null}
             {!result.log.audioUrl && result.log.durationS ? (
               <p className="mt-3 text-[11px] text-muted-foreground">
-                Audio wasn&apos;t stored — attach a Vercel Blob store (BLOB_READ_WRITE_TOKEN) to keep recordings.
+                Audio wasn&apos;t stored — attach a Vercel Blob store to keep recordings.
               </p>
             ) : null}
             {result.via === "heuristic" ? (

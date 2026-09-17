@@ -68,7 +68,7 @@ Fully containerised: `docker compose --profile app up --build`.
 ## Deploy to Vercel
 
 1. Create a Neon database and set `DATABASE_URL` (pooled connection string) in Vercel.
-2. Add `DEEPGRAM_API_KEY`, `ANTHROPIC_API_KEY`. Attach a Blob store (sets `BLOB_READ_WRITE_TOKEN`).
+2. Add `DEEPGRAM_API_KEY` (a **Member**-role key — needed to mint browser tokens), `ANTHROPIC_API_KEY`. Attach a Blob store under Storage (injects `BLOB_STORE_ID`; auth is via Vercel OIDC).
 3. Run the schema + seed once against Neon: `DATABASE_URL=... npm run db:push && npm run db:seed`.
 4. `vercel deploy`. Every PR gets a preview URL.
 
