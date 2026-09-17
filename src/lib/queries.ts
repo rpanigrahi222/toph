@@ -1,6 +1,7 @@
 import { and, asc, count, countDistinct, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { endOfMonth, startOfDay, startOfMonth, subDays } from "date-fns";
 import { db, schema } from "@/db";
+import { playbackUrl } from "@/lib/storage";
 import type { ActivityType, LogStatus } from "@/db/schema";
 
 const { logs, users, fields, logApplications, tags, auditEvents, products } = schema;
@@ -177,7 +178,7 @@ export async function getLog(id: string): Promise<LogDetail | null> {
     transcriptRaw: log.transcriptRaw,
     transcriptEn: log.transcriptEn,
     reviewReason: log.reviewReason,
-    audioUrl: log.audioUrl,
+    audioUrl: playbackUrl(log.id, log.audioUrl),
     audioMime: log.audioMime,
     durationS: log.durationS == null ? null : Number(log.durationS),
     peaks: log.peaks,
