@@ -163,6 +163,32 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const messageSender = pgEnum("message_sender", ["admin", "worker"]);
+
+/**
+ * Office ↔ field-crew messages. Each message is stored in the language it was
+ * written in plus a translation into the recipient's language, so a worker who
+ * speaks no English can read the office and vice versa.
+ */
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    farmId: uuid("farm_id").references(() => farms.id, { onDelete: "cascade" }).notNull(),
+    workerId: uuid("worker_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    sender: messageSender("sender").notNull(),
+    bodyOriginal: text("body_original").notNull(),
+    languageOriginal: text("language_original").notNull(),
+    bodyTranslated: text("body_translated"),
+    languageTranslated: text("language_translated"),
+    // Optional link back to the log this message is about (e.g. a re-record request).
+    logId: uuid("log_id").references(() => logs.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [index("messages_worker_created_idx").on(t.workerId, t.createdAt)],
+);
+
 // ---------------------------------------------------------------------------
 // Relations
 // ---------------------------------------------------------------------------
@@ -192,6 +218,12 @@ export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
 
 export const usersRelations = relations(users, ({ many }) => ({
   logs: many(logs),
+  messages: many(messages),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  worker: one(users, { fields: [messages.workerId], references: [users.id] }),
+  log: one(logs, { fields: [messages.logId], references: [logs.id] }),
 }));
 
 export const fieldsRelations = relations(fields, ({ many }) => ({
@@ -210,6 +242,7 @@ export type Log = typeof logs.$inferSelect;
 export type LogApplication = typeof logApplications.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
+export type Message = typeof messages.$inferSelect;
 
 export type ActivityType = (typeof activityType.enumValues)[number];
 export type LogStatus = (typeof logStatus.enumValues)[number];

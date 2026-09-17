@@ -253,6 +253,7 @@ export function Recorder({ workers }: { workers: User[] }) {
       fd.set("language", language);
       if (workerId) fd.set("workerId", workerId);
       fd.set("durationS", String(durationS));
+      fd.set("tzOffset", String(new Date().getTimezoneOffset()));
       fd.set("peaks", JSON.stringify(peaks));
       if (audio) fd.set("audio", audio, "recording");
       const res = await fetch("/api/logs/ingest", { method: "POST", body: fd });

@@ -17,16 +17,19 @@ const BodySchema = z.object({
   workerId: z.string().uuid().optional(),
   durationS: z.coerce.number().nonnegative().optional(),
   peaks: z.array(z.number()).optional(),
+  /** Browser `getTimezoneOffset()` in minutes, so "06:30" means the worker's 06:30, not the server's. */
+  tzOffset: z.coerce.number().default(0),
 });
 
-/** "HH:MM" on the recording's date → Date */
-function localTime(base: Date, hhmm: string | null): Date | null {
+/** "HH:MM" in the worker's local day (given their UTC offset in minutes) → Date */
+function localTime(base: Date, hhmm: string | null, tzOffsetMin: number): Date | null {
   if (!hhmm) return null;
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
   if (!m) return null;
-  const d = new Date(base);
-  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
-  return d;
+  // Shift to the worker's wall clock, set the time, shift back.
+  const local = new Date(base.getTime() - tzOffsetMin * 60_000);
+  local.setUTCHours(Number(m[1]), Number(m[2]), 0, 0);
+  return new Date(local.getTime() + tzOffsetMin * 60_000);
 }
 
 export async function POST(req: Request) {
@@ -38,6 +41,7 @@ export async function POST(req: Request) {
     workerId: form.get("workerId") || undefined,
     durationS: form.get("durationS") ?? undefined,
     peaks: form.get("peaks") ? JSON.parse(String(form.get("peaks"))) : undefined,
+    tzOffset: form.get("tzOffset") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 });
@@ -87,8 +91,10 @@ export async function POST(req: Request) {
       activityType: extraction.activity_type,
       status: extraction.needs_review ? "flagged" : "new",
       source: "online",
-      startedAt: localTime(recordedAt, extraction.started_at_local) ?? new Date(recordedAt.getTime() - (body.durationS ?? 0) * 1000),
-      endedAt: localTime(recordedAt, extraction.ended_at_local) ?? recordedAt,
+      startedAt:
+        localTime(recordedAt, extraction.started_at_local, body.tzOffset) ??
+        new Date(recordedAt.getTime() - (body.durationS ?? 0) * 1000),
+      endedAt: localTime(recordedAt, extraction.ended_at_local, body.tzOffset) ?? recordedAt,
       languageDetected: extraction.language_detected,
       transcriptRaw: body.transcript,
       transcriptEn: extraction.transcript_en,

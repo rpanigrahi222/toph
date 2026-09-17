@@ -15,6 +15,7 @@ any language, Toph transcribes them live, extracts the compliance-relevant facts
 | Multilingual | Auto-detect (code-switching across 10 languages) or pick one of 16. Original transcript is kept; the farmer reads an English translation + summary |
 | Confidence & review | Every log gets a 0–1 confidence and, when low, a `needs_review` flag with a reason. Admin fixes it inline; every edit lands in an audit trail |
 | Map | All fields on satellite imagery, coloured by **restricted-entry interval** (REI) computed from the product label of the last spray |
+| **Messages** | Office ↔ crew messaging. Admin writes English, the worker reads it in their own language (Claude translation, both versions stored). "View as worker" shows exactly what lands on the phone. Flagged logs have a one-click "Ask to re-record" that pre-fills a translated request |
 | Activity Logs | All logs, status filter, bulk "mark reviewed", CSV export |
 | Performance / Employees | Per-worker log counts, average confidence, flagged count |
 
@@ -87,6 +88,6 @@ Fully containerised: `docker compose --profile app up --build`.
 
 ## Not built (on purpose)
 
-Audit Manager, Reports, Schedule, Messages, Settings and Support are honest stubs
+Audit Manager, Reports, Schedule, Settings and Support are honest stubs
 that describe what they'd do. Auth is a seeded admin — "Switch User" and "Log Out"
 are visual only.

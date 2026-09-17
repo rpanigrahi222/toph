@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, Check, Expand, Languages, Star, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Check, Expand, Languages, MessageSquare, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -43,7 +44,6 @@ export function LogDetailPanel({ id, fields, onChanged }: { id: string; fields: 
     onError: () => toast.error("Could not save change"),
   });
 
-  const [showOriginal, setShowOriginal] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
 
@@ -109,12 +109,28 @@ export function LogDetailPanel({ id, fields, onChanged }: { id: string; fields: 
               <Button size="sm" onClick={() => patch.mutate({ status: "reviewed" })} disabled={patch.isPending}>
                 <Check data-icon="inline-start" /> Mark reviewed
               </Button>
+              {log.workerId ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-300 bg-white"
+                  render={
+                    <Link
+                      href={`/messages?worker=${log.workerId}&log=${log.id}&draft=${encodeURIComponent(
+                        `Hi ${log.workerName.split(" ")[0]}, I couldn't tell which field or product your log from ${fmtDate(log.createdAt)} was about. Could you record it again with the field name and what you applied? Thanks!`,
+                      )}`}
+                    />
+                  }
+                >
+                  <MessageSquare data-icon="inline-start" /> Ask to re-record
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_1fr]">
         {/* Left: audio + summary */}
         <div className="flex flex-col gap-3">
           <Waveform peaks={log.peaks} audioUrl={log.audioUrl} durationS={log.durationS} />
@@ -175,29 +191,30 @@ export function LogDetailPanel({ id, fields, onChanged }: { id: string; fields: 
 
           {/* Summary / transcript */}
           <div className="mt-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold">Summary</h3>
-              {nonEnglish ? (
-                <button
-                  onClick={() => setShowOriginal((v) => !v)}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
-                >
-                  <Languages className="size-3" />
-                  {showOriginal ? "Show English" : `Show original (${languageLabel(log.languageDetected)})`}
-                </button>
-              ) : null}
-            </div>
+            <h3 className="text-[13px] font-semibold">Summary</h3>
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{log.summary}</p>
 
-            <h3 className="mt-4 text-[13px] font-semibold">
-              Transcript{" "}
-              <span className="font-normal text-muted-foreground">
-                · {showOriginal || !nonEnglish ? languageLabel(log.languageDetected) : "English translation"}
-              </span>
-            </h3>
-            <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
-              “{showOriginal || !nonEnglish ? log.transcriptRaw : (log.transcriptEn ?? log.transcriptRaw)}”
-            </p>
+            {nonEnglish && log.transcriptEn ? (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-3">
+                  <h3 className="flex items-center gap-1.5 text-[12px] font-semibold text-sky-900">
+                    <Languages className="size-3.5" /> As spoken · {languageLabel(log.languageDetected)}
+                  </h3>
+                  <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/80">“{log.transcriptRaw}”</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <h3 className="text-[12px] font-semibold">English translation</h3>
+                  <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/80">“{log.transcriptEn}”</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="mt-4 text-[13px] font-semibold">
+                  Transcript <span className="font-normal text-muted-foreground">· {languageLabel(log.languageDetected)}</span>
+                </h3>
+                <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">“{log.transcriptRaw}”</p>
+              </>
+            )}
           </div>
         </div>
 

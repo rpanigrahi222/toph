@@ -13,6 +13,7 @@ const {
   tags,
   logTags,
   auditEvents,
+  messages,
 } = schema;
 
 // ---------------------------------------------------------------------------
@@ -413,6 +414,36 @@ async function main() {
       });
     }
   }
+
+  // --- Messages (office ↔ crew, stored in both languages) ------------------
+  const carlos = w["Carlos Mendoza"];
+  const lucas = w["Lucas Oliveira"];
+  await db.insert(messages).values([
+    {
+      farmId: farm.id, workerId: carlos.id, sender: "admin",
+      bodyOriginal: "Morning Carlos — Field B is under a 12-hour re-entry interval after yesterday's atrazine. Please stay out until 6 PM.",
+      languageOriginal: "en",
+      bodyTranslated: "Buenos días Carlos — el campo B tiene un intervalo de reingreso de 12 horas después de la atrazina de ayer. Por favor no entres hasta las 6 PM.",
+      languageTranslated: "es",
+      createdAt: subDays(today, 1),
+    },
+    {
+      farmId: farm.id, workerId: carlos.id, sender: "worker",
+      bodyOriginal: "Entendido. Voy a trabajar en el campo D mientras tanto. ¿Hay que revisar el pivote de la torre cuatro?",
+      languageOriginal: "es",
+      bodyTranslated: "Understood. I'll work on Field D in the meantime. Does the tower four pivot need checking?",
+      languageTranslated: "en",
+      createdAt: addMinutes(subDays(today, 1), 25),
+    },
+    {
+      farmId: farm.id, workerId: lucas.id, sender: "admin",
+      bodyOriginal: "Lucas, great scouting notes this week. Can you check the north edge of Field A for aphids tomorrow?",
+      languageOriginal: "en",
+      bodyTranslated: "Lucas, ótimas anotações de monitoramento esta semana. Você pode verificar a borda norte do campo A em busca de pulgões amanhã?",
+      languageTranslated: "pt",
+      createdAt: subDays(today, 2),
+    },
+  ]);
 
   console.log(`Seeded ${seedLogs.length} logs, ${workers.length} workers, ${fieldRows.length} fields, ${productRows.length} products.`);
   process.exit(0);
