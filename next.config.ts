@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Needed by the Dockerfile (node server.js); harmless on Vercel.
+  output: "standalone",
 };
 
 export default nextConfig;
