@@ -54,42 +54,6 @@ Key decisions:
   reviewer Postgres in one command; the `Dockerfile` proves the app runs anywhere
   containers do. Vercel deploys the same code with Neon as the database.
 
-## Run it locally
-
-```bash
-cp .env.example .env          # add DEEPGRAM_API_KEY and ANTHROPIC_API_KEY
-npm install
-npm run setup                 # docker compose up db → drizzle push → seed
-npm run dev                   # http://localhost:3000
-```
-
-Without API keys the dashboard, map and seeded data all work; `/record` falls back
-to a typed transcript and keyword extraction.
-
-Fully containerised: `docker compose --profile app up --build`.
-
-## Deploy to Vercel
-
-1. Create a Neon database and set `DATABASE_URL` (pooled connection string) in Vercel.
-2. Add `DEEPGRAM_API_KEY` (a **Member**-role key — needed to mint browser tokens), `ANTHROPIC_API_KEY`. Attach a Blob store under Storage (injects `BLOB_STORE_ID`; auth is via Vercel OIDC).
-3. Run the schema + seed once against Neon: `DATABASE_URL=... npm run db:push && npm run db:seed`.
-4. `vercel deploy`. Every PR gets a preview URL.
-
-## Scripts
-
-| | |
-|---|---|
-| `npm run setup` | start Postgres, push schema, seed |
-| `npm run db:seed` | reseed (wipes data) |
-| `npm run db:studio` | Drizzle Studio |
-| `npm run typecheck` / `npm run lint` | |
-
-## Data model
-
-`farms → users (admin/worker) · fields (GeoJSON) · products (REI hours, aliases)`
-`logs → log_applications (product, rate, unit) · log_tags · audit_events`
-`messages · audits · reports (saved keyword queries) · schedule_tasks`
-
 ## Not built (on purpose)
 
 Settings and Support are honest stubs. Auth is a seeded admin — "Switch User" and
