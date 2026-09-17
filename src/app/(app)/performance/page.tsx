@@ -10,8 +10,8 @@ export default async function PerformancePage() {
   return (
     <>
       <PageHeader title="Performance" subtitle="Logging activity and extraction quality per worker, last 30 days" search={false} />
-      <div className="rounded-xl border border-border bg-white">
-        <table className="w-full text-[13px]">
+      <div className="overflow-x-auto rounded-xl border border-border bg-white">
+        <table className="w-full min-w-[560px] text-[13px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-2.5 font-medium">Employee</th>

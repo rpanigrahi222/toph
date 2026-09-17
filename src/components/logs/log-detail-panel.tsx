@@ -196,7 +196,7 @@ export function LogDetailPanel({ id, fields, onChanged }: { id: string; fields: 
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{log.summary}</p>
 
             {nonEnglish && log.transcriptEn ? (
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-3">
                   <h3 className="flex items-center gap-1.5 text-[12px] font-semibold text-sky-900">
                     <Languages className="size-3.5" /> As spoken · {languageLabel(log.languageDetected)}

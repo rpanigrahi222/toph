@@ -189,6 +189,62 @@ export const messages = pgTable(
   (t) => [index("messages_worker_created_idx").on(t.workerId, t.createdAt)],
 );
 
+export const auditStatus = pgEnum("audit_status", ["scheduled", "in_progress", "passed", "findings"]);
+
+/** Compliance inspections (county ag commissioner, organic certifier, buyer audits…). */
+export const audits = pgTable("audits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  farmId: uuid("farm_id").references(() => farms.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  agency: text("agency"),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  status: auditStatus("status").notNull().default("scheduled"),
+  scope: text("scope"), // what they're looking at: "Pesticide use records Q3", "Worker REI compliance"
+  fieldId: uuid("field_id").references(() => fields.id, { onDelete: "set null" }),
+  findings: text("findings"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const reportType = pgEnum("report_type", ["pesticide_use", "fertilizer", "field_activity", "custom"]);
+
+/**
+ * Saved reports. A report is a query, not a snapshot: keywords + date range +
+ * optional field, matched against transcripts/summaries/products at view time.
+ */
+export const reports = pgTable("reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  farmId: uuid("farm_id").references(() => farms.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  type: reportType("type").notNull().default("custom"),
+  keywords: text("keywords").array().notNull().default(sql`'{}'::text[]`),
+  fieldId: uuid("field_id").references(() => fields.id, { onDelete: "set null" }),
+  fromDate: timestamp("from_date", { withTimezone: true }),
+  toDate: timestamp("to_date", { withTimezone: true }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const taskStatus = pgEnum("task_status", ["planned", "done", "cancelled"]);
+
+/** Planned work on the calendar. */
+export const scheduleTasks = pgTable(
+  "schedule_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    farmId: uuid("farm_id").references(() => farms.id, { onDelete: "cascade" }).notNull(),
+    title: text("title").notNull(),
+    activityType: activityType("activity_type").notNull().default("other"),
+    fieldId: uuid("field_id").references(() => fields.id, { onDelete: "set null" }),
+    workerId: uuid("worker_id").references(() => users.id, { onDelete: "set null" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    status: taskStatus("status").notNull().default("planned"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("schedule_tasks_farm_starts_idx").on(t.farmId, t.startsAt)],
+);
+
 // ---------------------------------------------------------------------------
 // Relations
 // ---------------------------------------------------------------------------
@@ -221,6 +277,19 @@ export const usersRelations = relations(users, ({ many }) => ({
   messages: many(messages),
 }));
 
+export const auditsRelations = relations(audits, ({ one }) => ({
+  field: one(fields, { fields: [audits.fieldId], references: [fields.id] }),
+}));
+
+export const reportsRelations = relations(reports, ({ one }) => ({
+  field: one(fields, { fields: [reports.fieldId], references: [fields.id] }),
+}));
+
+export const scheduleTasksRelations = relations(scheduleTasks, ({ one }) => ({
+  field: one(fields, { fields: [scheduleTasks.fieldId], references: [fields.id] }),
+  worker: one(users, { fields: [scheduleTasks.workerId], references: [users.id] }),
+}));
+
 export const messagesRelations = relations(messages, ({ one }) => ({
   worker: one(users, { fields: [messages.workerId], references: [users.id] }),
   log: one(logs, { fields: [messages.logId], references: [logs.id] }),
@@ -243,6 +312,10 @@ export type LogApplication = typeof logApplications.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type Audit = typeof audits.$inferSelect;
+export type Report = typeof reports.$inferSelect;
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+export type ReportType = (typeof reportType.enumValues)[number];
 
 export type ActivityType = (typeof activityType.enumValues)[number];
 export type LogStatus = (typeof logStatus.enumValues)[number];

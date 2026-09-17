@@ -34,7 +34,7 @@ export function SearchBox() {
   }, [value]);
 
   return (
-    <label className="flex h-8 w-[270px] items-center gap-2 rounded-full border border-border bg-white px-3 text-[13px] text-muted-foreground focus-within:border-foreground/30">
+    <label className="flex h-8 w-full items-center sm:w-[270px] gap-2 rounded-full border border-border bg-white px-3 text-[13px] text-muted-foreground focus-within:border-foreground/30">
       <Search className="size-3.5" />
       <input
         value={value}

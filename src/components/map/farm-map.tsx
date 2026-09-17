@@ -55,7 +55,7 @@ export function FarmMap({ fields }: { fields: FarmMapField[] }) {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-      <div className="h-[calc(100vh-140px)] min-h-[420px] overflow-hidden rounded-xl border border-border">
+      <div className="h-[50vh] min-h-[320px] overflow-hidden rounded-xl border border-border lg:h-[calc(100vh-140px)] lg:min-h-[420px]">
         <FieldMapLazy fields={mapFields} focusCode={selected ? rows.find((r) => r.id === selected)?.code : undefined} onSelect={(f) => setSelected(f.id)} />
       </div>
 

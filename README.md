@@ -16,6 +16,9 @@ any language, Toph transcribes them live, extracts the compliance-relevant facts
 | Confidence & review | Every log gets a 0–1 confidence and, when low, a `needs_review` flag with a reason. Admin fixes it inline; every edit lands in an audit trail |
 | Map | All fields on satellite imagery, coloured by **restricted-entry interval** (REI) computed from the product label of the last spray |
 | **Messages** | Office ↔ crew messaging. Admin writes English, the worker reads it in their own language (Claude translation, both versions stored). "View as worker" shows exactly what lands on the phone. Flagged logs have a one-click "Ask to re-record" that pre-fills a translated request |
+| **Reports** | Saved keyword reports with presets (pesticide use, fertilizer, per-field, custom). Keywords come from the preset plus the farm's own product catalog; matches are highlighted in transcripts; CSV + print |
+| **Schedule** | Month calendar of planned work (activity, field, worker). Days show how many voice logs were actually recorded, so planned vs. done is visible at a glance |
+| **Audit Manager** | Inspections (agency, date, scope, findings, status) plus the change history of every edit across all logs |
 | Activity Logs | All logs, status filter, bulk "mark reviewed", CSV export |
 | Performance / Employees | Per-worker log counts, average confidence, flagged count |
 
@@ -85,9 +88,9 @@ Fully containerised: `docker compose --profile app up --build`.
 
 `farms → users (admin/worker) · fields (GeoJSON) · products (REI hours, aliases)`
 `logs → log_applications (product, rate, unit) · log_tags · audit_events`
+`messages · audits · reports (saved keyword queries) · schedule_tasks`
 
 ## Not built (on purpose)
 
-Audit Manager, Reports, Schedule, Settings and Support are honest stubs
-that describe what they'd do. Auth is a seeded admin — "Switch User" and "Log Out"
-are visual only.
+Settings and Support are honest stubs. Auth is a seeded admin — "Switch User" and
+"Log Out" are visual only.

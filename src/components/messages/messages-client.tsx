@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Languages, Send, Smartphone } from "lucide-react";
+import { ChevronLeft, Languages, Send, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES, languageLabel } from "@/lib/format";
@@ -31,7 +31,7 @@ export function MessagesClient({
 }) {
   const router = useRouter();
   const qc = useQueryClient();
-  const [workerId, setWorkerId] = useState(initialWorkerId);
+  const [workerId, setWorkerId] = useState<string | null>(initialWorkerId);
   const [draft, setDraft] = useState(initialDraft);
   const [sender, setSender] = useState<"admin" | "worker">("admin");
   const [workerView, setWorkerView] = useState(false);
@@ -76,9 +76,9 @@ export function MessagesClient({
   });
 
   return (
-    <div className="grid h-[calc(100vh-140px)] min-h-[480px] grid-cols-[260px_1fr] overflow-hidden rounded-xl border border-border bg-white">
+    <div className="grid h-[calc(100vh-150px)] min-h-[480px] grid-cols-1 overflow-hidden rounded-xl border border-border bg-white md:grid-cols-[260px_1fr]">
       {/* Worker list */}
-      <aside className="overflow-y-auto border-r border-border">
+      <aside className={cn("overflow-y-auto border-r border-border", workerId && "hidden md:block")}>
         {workers.map((w) => (
           <button
             key={w.id}
@@ -112,13 +112,18 @@ export function MessagesClient({
       {/* Thread */}
       {worker ? (
         <section className="flex min-h-0 flex-col">
-          <header className="flex items-center justify-between border-b border-border px-5 py-3">
-            <div>
+          <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setWorkerId(null)} className="rounded-md p-1 hover:bg-muted md:hidden" aria-label="Back to workers">
+                <ChevronLeft className="size-4" />
+              </button>
+              <div>
               <div className="text-[14px] font-semibold">{worker.name}</div>
               <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                 <Languages className="size-3.5" />
                 Speaks {languageLabel(workerLang)}
                 {workerLang !== "en" ? ` · your English is delivered in ${native}` : ""}
+              </div>
               </div>
             </div>
             {workerLang !== "en" ? (

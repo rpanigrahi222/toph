@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   ArrowLeftRight,
   AudioLines,
@@ -14,6 +16,7 @@ import {
   LogOut,
   Mail,
   Map as MapIcon,
+  Menu,
   MessageCircleQuestion,
   Mic,
   Settings,
@@ -26,7 +29,52 @@ import { cn } from "@/lib/utils";
 type NavItem = { href: string; label: string; icon: LucideIcon; badge?: number };
 type NavSection = { title: string; items: NavItem[] };
 
+/**
+ * >= lg: fixed left sidebar (the design). < lg: a slim top bar with a menu
+ * button that opens the same navigation in a sheet.
+ */
 export function Sidebar({ farmName, newCount }: { farmName: string; newCount: number }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  // Close the sheet after navigating (derived-state pattern, no effect needed).
+  const [lastPath, setLastPath] = useState(pathname);
+  if (pathname !== lastPath) {
+    setLastPath(pathname);
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <aside className="sticky top-0 hidden h-screen w-[208px] shrink-0 flex-col border-r border-border bg-white px-3 py-3 lg:flex">
+        <SidebarBody farmName={farmName} newCount={newCount} />
+      </aside>
+
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-white px-4 py-2.5 lg:hidden">
+        <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-md p-1.5 hover:bg-muted">
+          <Menu className="size-5" />
+        </button>
+        <div className="flex size-7 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-semibold text-white">
+          {initials(farmName)}
+        </div>
+        <div className="text-[13px] font-semibold">{farmName}</div>
+        <Link href="/record" className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white">
+          <Mic className="size-3.5" /> Record
+        </Link>
+      </header>
+
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="left" className="w-[240px] p-3" showCloseButton={false}>
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <div className="flex h-full flex-col">
+            <SidebarBody farmName={farmName} newCount={newCount} />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+function SidebarBody({ farmName, newCount }: { farmName: string; newCount: number }) {
   const pathname = usePathname();
 
   const sections: NavSection[] = [
@@ -64,7 +112,7 @@ export function Sidebar({ farmName, newCount }: { farmName: string; newCount: nu
   ];
 
   return (
-    <aside className="flex h-screen w-[208px] shrink-0 flex-col border-r border-border bg-white px-3 py-3 sticky top-0">
+    <>
       {/* Farm / user block */}
       <div className="flex items-center gap-2.5 rounded-lg border border-border px-2 py-2">
         <div className="flex size-8 items-center justify-center rounded-full bg-emerald-700 text-[11px] font-semibold text-white">
@@ -134,7 +182,7 @@ export function Sidebar({ farmName, newCount }: { farmName: string; newCount: nu
           Log Out
         </button>
       </div>
-    </aside>
+    </>
   );
 }
 

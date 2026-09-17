@@ -138,14 +138,14 @@ export function LogsTable({ title, initial, fields, workers, showStatus }: Props
   return (
     <div className="rounded-xl border border-border bg-white">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2 text-[14px] font-medium">
           <AudioLines className="size-4" strokeWidth={1.75} />
           {title} <span className="font-normal text-muted-foreground">({total})</span>
           {isFetching ? <span className="ml-1 size-1.5 animate-pulse rounded-full bg-emerald-500" /> : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Date */}
           <Popover>
             <PopoverTrigger
@@ -268,7 +268,8 @@ export function LogsTable({ title, initial, fields, workers, showStatus }: Props
       ) : null}
 
       {/* Table */}
-      <table className="w-full table-fixed border-collapse text-[13px]">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] table-fixed border-collapse text-[13px]">
         <colgroup>
           <col className="w-12" />
           <col className="w-[22%]" />
@@ -325,6 +326,7 @@ export function LogsTable({ title, initial, fields, workers, showStatus }: Props
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

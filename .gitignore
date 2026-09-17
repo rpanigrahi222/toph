@@ -48,3 +48,8 @@ public/maplibre
 
 .vercel
 .env*
+
+# editor/agent tooling
+.claude/
+CLAUDE.md
+AGENTS.md

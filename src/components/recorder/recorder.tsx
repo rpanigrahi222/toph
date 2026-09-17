@@ -289,18 +289,18 @@ export function Recorder({ workers }: { workers: User[] }) {
   const detectedList = [...detected].filter((l) => l !== "multi");
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
       {/* Main recorder card */}
-      <div className="rounded-xl border border-border bg-white p-6">
+      <div className="rounded-xl border border-border bg-white p-4 sm:p-6">
         {/* Controls row */}
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1 text-[12px]">
+        <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+          <label className="flex w-full flex-col gap-1 text-[12px] sm:w-auto">
             <span className="text-muted-foreground">Language</span>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
               disabled={phase === "recording" || phase === "connecting"}
-              className="h-9 min-w-[200px] rounded-md border border-border bg-white px-2 text-[13px]"
+              className="h-9 w-full min-w-0 rounded-md border border-border bg-white px-2 text-[13px] sm:w-auto sm:min-w-[200px]"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -310,13 +310,13 @@ export function Recorder({ workers }: { workers: User[] }) {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-[12px]">
+          <label className="flex w-full flex-col gap-1 text-[12px] sm:w-auto">
             <span className="text-muted-foreground">Recording as</span>
             <select
               value={workerId}
               onChange={(e) => setWorkerId(e.target.value)}
               disabled={phase === "recording" || phase === "connecting"}
-              className="h-9 min-w-[180px] rounded-md border border-border bg-white px-2 text-[13px]"
+              className="h-9 w-full min-w-0 rounded-md border border-border bg-white px-2 text-[13px] sm:w-auto sm:min-w-[180px]"
             >
               {workers.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -325,7 +325,7 @@ export function Recorder({ workers }: { workers: User[] }) {
               ))}
             </select>
           </label>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
             {phase === "recording" ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[12px] font-medium text-red-700">
                 <span className="size-2 animate-pulse rounded-full bg-red-500" /> REC {fmtElapsed(elapsed)}

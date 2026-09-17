@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { subDays, setHours, setMinutes, addMinutes } from "date-fns";
+import { subDays, addDays, setHours, setMinutes, addMinutes, startOfMonth } from "date-fns";
+import { keywordsForPreset } from "../lib/reports";
 import { db, schema } from "./index";
 import type { ActivityType } from "./schema";
 
@@ -14,6 +15,9 @@ const {
   logTags,
   auditEvents,
   messages,
+  audits,
+  reports,
+  scheduleTasks,
 } = schema;
 
 // ---------------------------------------------------------------------------
@@ -443,6 +447,76 @@ async function main() {
       languageTranslated: "pt",
       createdAt: subDays(today, 2),
     },
+  ]);
+
+  // --- Inspections ------------------------------------------------------------
+  await db.insert(audits).values([
+    {
+      farmId: farm.id, title: "County pesticide use records review", agency: "County Agricultural Commissioner",
+      scheduledFor: at(addDays(today, 9), 10, 0), status: "scheduled",
+      scope: "Q3 pesticide use reports, REI posting at treated fields, applicator licenses.",
+    },
+    {
+      farmId: farm.id, title: "Organic certifier field walk — Home Place", agency: "CCOF",
+      scheduledFor: at(addDays(today, 21), 8, 30), status: "scheduled", fieldId: f["FIELD D"].id,
+      scope: "Buffer zones, input records, drift risk from Field B applications.",
+    },
+    {
+      farmId: farm.id, title: "Worker protection standard check", agency: "State OSHA",
+      scheduledFor: at(subDays(today, 18), 9, 0), status: "passed",
+      scope: "PPE availability, decontamination supplies, training cards.",
+      findings: "No findings. Recommended laminated REI signs at pivot access points.",
+    },
+    {
+      farmId: farm.id, title: "Buyer traceability audit", agency: "Fresh Harvest Co-op",
+      scheduledFor: at(subDays(today, 40), 13, 0), status: "findings",
+      scope: "Spray-to-harvest intervals on Field B.",
+      findings: "One harvest logged 3 days after a Lorsban application (label PHI 21 days). Corrected record; crew re-trained.",
+    },
+  ]);
+
+  // --- Reports ------------------------------------------------------------------
+  await db.insert(reports).values([
+    {
+      farmId: farm.id, title: "Pesticide use report — this month", type: "pesticide_use",
+      keywords: keywordsForPreset("pesticide_use", productRows), fromDate: startOfMonth(today),
+      notes: "Monthly submission to the county. Due the 10th.",
+    },
+    {
+      farmId: farm.id, title: "Fertilizer applications — last 30 days", type: "fertilizer",
+      keywords: keywordsForPreset("fertilizer", productRows), fromDate: subDays(today, 30),
+    },
+    {
+      farmId: farm.id, title: "Field B — everything", type: "field_activity",
+      keywords: [], fieldId: f["FIELD B"].id, fromDate: subDays(today, 30),
+      notes: "Prep for the certifier walk: what touched Creek Bottom.",
+    },
+    {
+      farmId: farm.id, title: "Equipment problems", type: "custom",
+      keywords: ["leak", "dripping", "nozzle", "broke", "repair", "maintenance", "oil"],
+    },
+  ]);
+
+  // --- Schedule ----------------------------------------------------------------
+  const task = (dayOffset: number, h: number, title: string, activity: ActivityType, field: string, worker: string, status: "planned" | "done" = "planned", notes?: string) => ({
+    farmId: farm.id, title, activityType: activity, fieldId: f[field].id, workerId: w[worker].id,
+    startsAt: at(addDays(today, dayOffset), h, 0), endsAt: at(addDays(today, dayOffset), h + 3, 0), status, notes: notes ?? null,
+  });
+  await db.insert(scheduleTasks).values([
+    task(-3, 6, "Spray Roundup", "spraying", "FIELD A", "Isaac Wang", "done", "32 oz/ac. Wind < 10 mph."),
+    task(-2, 7, "Combine corn", "harvesting", "FIELD B", "Maya Patel", "done"),
+    task(-1, 8, "Plant soybeans", "planting", "FIELD C", "Liam Johnson", "done", "30-inch rows, 140k population"),
+    task(0, 6, "Pivot — 0.75 in", "irrigating", "FIELD D", "Sophia Lee", "done"),
+    task(0, 13, "Scout for aphids", "scouting", "FIELD B", "Carlos Mendoza", "done"),
+    task(1, 7, "Fix tower 4 nozzle", "equipment_maintenance", "FIELD D", "Noah Williams", "planned", "Reported by Sophia — dripping"),
+    task(1, 9, "Urea top-dress", "fertilizing", "FIELD C", "Diego Ramirez", "planned", "150 lb/ac"),
+    task(2, 6, "Warrior II — aphids NE corner", "spraying", "FIELD B", "Carlos Mendoza", "planned", "24h REI. Post signs."),
+    task(3, 8, "Finish combining", "harvesting", "FIELD B", "Maya Patel"),
+    task(5, 7, "Walk fence line", "scouting", "FIELD A", "Fatima Hassan"),
+    task(7, 8, "Field cultivator", "soil_work", "FIELD C", "Lucas Oliveira"),
+    task(9, 10, "County inspection", "other", "FIELD A", "Isaac Wang", "planned", "Have spray records printed."),
+    task(12, 6, "Headline fungicide", "spraying", "FIELD A", "Aiko Tanaka", "planned", "12h REI"),
+    task(14, 7, "Pivot — 1 in", "irrigating", "FIELD D", "Sophia Lee"),
   ]);
 
   console.log(`Seeded ${seedLogs.length} logs, ${workers.length} workers, ${fieldRows.length} fields, ${productRows.length} products.`);

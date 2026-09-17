@@ -22,7 +22,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/">) {
     <>
       <PageHeader title="Dashboard" subtitle="An overview of your farm and employee activity" />
 
-      <div className="mb-4 grid grid-cols-3 gap-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard
           icon={Calendar}
           label="Todays Recordings"
