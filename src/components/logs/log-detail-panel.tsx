@@ -113,6 +113,7 @@ export function LogDetailPanel({ id, fields, onChanged }: { id: string; fields: 
                 <Button
                   size="sm"
                   variant="outline"
+                  nativeButton={false}
                   className="border-amber-300 bg-white"
                   render={
                     <Link

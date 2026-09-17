@@ -63,6 +63,7 @@ export async function POST(req: Request) {
   if (audio instanceof Blob && audio.size > 0) {
     audioMime = audio.type || "audio/webm";
     audioUrl = await storeAudio(Buffer.from(await audio.arrayBuffer()), audioMime);
+    if (!audioUrl) audioMime = null;
   }
 
   // 2. Transcript → structured record.

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DeepgramClient } from "@deepgram/sdk";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Keyboard, Loader2, Mic, Sparkles, Square } from "lucide-react";
+import { ArrowRight, Keyboard, Loader2, Mic, Send, Sparkles, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LANGUAGES, activityLabel, languageLabel } from "@/lib/format";
@@ -12,7 +12,10 @@ import type { LogDetail } from "@/lib/queries";
 import type { User } from "@/db/schema";
 import { cn } from "@/lib/utils";
 
-type Phase = "idle" | "connecting" | "recording" | "processing" | "done" | "error";
+type Phase = "idle" | "connecting" | "recording" | "review" | "processing" | "done" | "error";
+
+/** A finished recording waiting for the worker to confirm and send. */
+type Pending = { transcript: string; audio: Blob | null; audioUrl: string | null; durationS: number; peaks: number[] };
 
 type TokenResponse = { accessToken: string; expiresIn: number; keyterms: string[] };
 
@@ -40,6 +43,7 @@ export function Recorder({ workers }: { workers: User[] }) {
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [typeMode, setTypeMode] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
 
   // Refs mirror the transcript state so stop() reads the latest values after
   // Deepgram flushes its final segment.
@@ -78,6 +82,8 @@ export function Recorder({ workers }: { workers: User[] }) {
   }
 
   async function start() {
+    if (pending?.audioUrl) URL.revokeObjectURL(pending.audioUrl);
+    setPending(null);
     setError(null);
     setResult(null);
     finalsRef.current = [];
@@ -242,7 +248,15 @@ export function Recorder({ workers }: { workers: User[] }) {
       setPhase("error");
       return;
     }
-    await submit(transcript, audio, durationS, peaks);
+    // Hand over to the review step — the worker confirms before it hits the dashboard.
+    setPending({ transcript, audio, audioUrl: audio.size ? URL.createObjectURL(audio) : null, durationS, peaks });
+    setPhase("review");
+  }
+
+  function discardPending() {
+    if (pending?.audioUrl) URL.revokeObjectURL(pending.audioUrl);
+    setPending(null);
+    setPhase("idle");
   }
 
   async function submit(transcript: string, audio: Blob | null, durationS: number, peaks: number[]) {
@@ -260,6 +274,8 @@ export function Recorder({ workers }: { workers: User[] }) {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Ingest failed");
       const j = (await res.json()) as { log: LogDetail; via: string };
       setResult(j);
+      if (pending?.audioUrl) URL.revokeObjectURL(pending.audioUrl);
+      setPending(null);
       setPhase("done");
       qc.invalidateQueries({ queryKey: ["logs"] });
       toast.success("Log created", { description: j.log.summary ?? undefined });
@@ -350,6 +366,7 @@ export function Recorder({ workers }: { workers: User[] }) {
             {phase === "idle" && "Tap to start. The transcript streams live as you speak."}
             {phase === "connecting" && "Connecting to Deepgram…"}
             {phase === "recording" && "Listening — tap the square to finish."}
+            {phase === "review" && "Check the transcript below, then send it to the dashboard."}
             {phase === "processing" && "Transcribing the last words, then extracting the log…"}
             {phase === "done" && "Saved. Record another, or open the dashboard."}
             {phase === "error" && (error ?? "Something went wrong.")}
@@ -361,17 +378,50 @@ export function Recorder({ workers }: { workers: User[] }) {
           {PROMPTS[language] ?? PROMPTS.en}
         </p>
 
-        {/* Live transcript */}
-        <div className="mt-6 min-h-[120px] rounded-lg border border-border bg-muted/30 px-4 py-3 text-[15px] leading-relaxed">
-          {liveText ? (
-            <>
-              <span>{finals.join(" ")}</span>
-              {interim ? <span className="text-muted-foreground"> {interim}</span> : null}
-            </>
-          ) : (
-            <span className="text-muted-foreground/60">Transcript will appear here…</span>
-          )}
-        </div>
+        {/* Review step: play back, fix any mis-heard words, then send */}
+        {phase === "review" && pending ? (
+          <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-[13px] font-semibold text-emerald-900">Review your log</div>
+              <div className="text-[12px] text-muted-foreground">
+                {fmtElapsed(Math.round(pending.durationS))} · {languageLabel(language)}
+              </div>
+            </div>
+            {pending.audioUrl ? <audio controls src={pending.audioUrl} className="mt-3 h-9 w-full" /> : null}
+            <textarea
+              value={pending.transcript}
+              onChange={(e) => setPending({ ...pending, transcript: e.target.value })}
+              rows={4}
+              className="mt-3 w-full rounded-md border border-border bg-white px-3 py-2 text-[15px] leading-relaxed outline-none focus:border-emerald-400"
+            />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Tap any word to correct it — this is exactly what gets extracted.
+            </p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={discardPending}>
+                <Trash2 data-icon="inline-start" /> Discard
+              </Button>
+              <Button
+                onClick={() => submit(pending.transcript.trim(), pending.audio, pending.durationS, pending.peaks)}
+                disabled={!pending.transcript.trim()}
+              >
+                <Send data-icon="inline-start" /> Send to dashboard
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Live transcript */
+          <div className="mt-6 min-h-[120px] rounded-lg border border-border bg-muted/30 px-4 py-3 text-[15px] leading-relaxed">
+            {liveText ? (
+              <>
+                <span>{finals.join(" ")}</span>
+                {interim ? <span className="text-muted-foreground"> {interim}</span> : null}
+              </>
+            ) : (
+              <span className="text-muted-foreground/60">Transcript will appear here…</span>
+            )}
+          </div>
+        )}
 
         {/* Typed fallback */}
         <div className="mt-4">
@@ -434,12 +484,17 @@ export function Recorder({ workers }: { workers: User[] }) {
             {result.log.needsReview ? (
               <p className="mt-3 rounded-md bg-amber-100 px-3 py-2 text-[12px] text-amber-900">{result.log.reviewReason}</p>
             ) : null}
+            {!result.log.audioUrl && result.log.durationS ? (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Audio wasn&apos;t stored — attach a Vercel Blob store (BLOB_READ_WRITE_TOKEN) to keep recordings.
+              </p>
+            ) : null}
             {result.via === "heuristic" ? (
               <p className="mt-3 text-[11px] text-muted-foreground">
                 Extracted with the keyword fallback — set ANTHROPIC_API_KEY for LLM extraction.
               </p>
             ) : null}
-            <Button className="mt-4 w-full" render={<Link href="/" />}>
+            <Button className="mt-4 w-full" nativeButton={false} render={<Link href="/" />}>
               Open on dashboard <ArrowRight data-icon="inline-end" />
             </Button>
           </div>
