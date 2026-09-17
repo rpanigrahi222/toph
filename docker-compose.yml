@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: toph-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: toph
+      POSTGRES_PASSWORD: toph
+      POSTGRES_DB: toph
+    ports:
+      - "5432:5432"
+    volumes:
+      - toph-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U toph -d toph"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Optional: run the app itself in Docker (`docker compose --profile app up`).
+  # Day-to-day dev uses `npm run dev` against the db service above.
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: toph-app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://toph:toph@db:5432/toph
+    ports:
+      - "3000:3000"
+
+volumes:
+  toph-pgdata:

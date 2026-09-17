@@ -1,0 +1,137 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { extractLog } from "@/lib/extract";
+import { storeAudio } from "@/lib/storage";
+import { getLog, listFields, listProducts } from "@/lib/queries";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const { logs, logApplications, auditEvents, users } = schema;
+
+const BodySchema = z.object({
+  transcript: z.string().min(1, "Transcript is empty"),
+  language: z.string().default("multi"),
+  workerId: z.string().uuid().optional(),
+  durationS: z.coerce.number().nonnegative().optional(),
+  peaks: z.array(z.number()).optional(),
+});
+
+/** "HH:MM" on the recording's date → Date */
+function localTime(base: Date, hhmm: string | null): Date | null {
+  if (!hhmm) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return null;
+  const d = new Date(base);
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  return d;
+}
+
+export async function POST(req: Request) {
+  const form = await req.formData();
+
+  const parsed = BodySchema.safeParse({
+    transcript: form.get("transcript"),
+    language: form.get("language") ?? undefined,
+    workerId: form.get("workerId") || undefined,
+    durationS: form.get("durationS") ?? undefined,
+    peaks: form.get("peaks") ? JSON.parse(String(form.get("peaks"))) : undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const farm = await db.query.farms.findFirst();
+  if (!farm) return NextResponse.json({ error: "No farm seeded" }, { status: 500 });
+
+  // Worker: explicit, else the first worker (demo default).
+  const worker = body.workerId
+    ? await db.query.users.findFirst({ where: eq(users.id, body.workerId) })
+    : await db.query.users.findFirst({ where: eq(users.role, "worker") });
+
+  // 1. Audio → storage (optional; transcript-only submissions are allowed).
+  let audioUrl: string | null = null;
+  let audioMime: string | null = null;
+  const audio = form.get("audio");
+  if (audio instanceof Blob && audio.size > 0) {
+    audioMime = audio.type || "audio/webm";
+    audioUrl = await storeAudio(Buffer.from(await audio.arrayBuffer()), audioMime);
+  }
+
+  // 2. Transcript → structured record.
+  const recordedAt = new Date();
+  const [fields, products] = await Promise.all([listFields(), listProducts()]);
+  const { extraction, via } = await extractLog({
+    transcript: body.transcript,
+    languageHint: body.language,
+    recordedAt,
+    workerName: worker?.name ?? "Unknown",
+    fields,
+    products,
+  });
+
+  const field = extraction.field_code
+    ? fields.find((f) => f.code.toLowerCase() === extraction.field_code!.toLowerCase()) ?? null
+    : null;
+
+  // 3. Persist.
+  const [log] = await db
+    .insert(logs)
+    .values({
+      farmId: farm.id,
+      workerId: worker?.id ?? null,
+      fieldId: field?.id ?? null,
+      activityType: extraction.activity_type,
+      status: extraction.needs_review ? "flagged" : "new",
+      source: "online",
+      startedAt: localTime(recordedAt, extraction.started_at_local) ?? new Date(recordedAt.getTime() - (body.durationS ?? 0) * 1000),
+      endedAt: localTime(recordedAt, extraction.ended_at_local) ?? recordedAt,
+      languageDetected: extraction.language_detected,
+      transcriptRaw: body.transcript,
+      transcriptEn: extraction.transcript_en,
+      summary: extraction.summary_en,
+      audioUrl,
+      audioMime,
+      durationS: body.durationS?.toFixed(2) ?? null,
+      peaks: body.peaks ?? null,
+      confidence: extraction.confidence.toFixed(2),
+      needsReview: extraction.needs_review,
+      reviewReason: extraction.review_reason,
+      extraction: { ...extraction, via },
+      createdAt: recordedAt,
+      syncedAt: recordedAt,
+    })
+    .returning();
+
+  if (extraction.products.length) {
+    await db.insert(logApplications).values(
+      extraction.products.map((p) => {
+        const match = products.find(
+          (kp) =>
+            kp.name.toLowerCase() === p.name.toLowerCase() ||
+            kp.aliases.some((a) => a.toLowerCase() === p.name.toLowerCase()),
+        );
+        return {
+          logId: log.id,
+          productId: match?.id ?? null,
+          productName: match?.name ?? p.name,
+          rate: p.rate?.toString() ?? null,
+          unit: p.unit,
+        };
+      }),
+    );
+  }
+
+  await db.insert(auditEvents).values({
+    logId: log.id,
+    userId: worker?.id ?? null,
+    action: "created",
+    diff: { source: "online", language: body.language, extraction_via: via },
+  });
+
+  const detail = await getLog(log.id);
+  return NextResponse.json({ log: detail, via }, { status: 201 });
+}

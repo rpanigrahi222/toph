@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Toph — farm activity dashboard
 
-## Getting Started
+Full-stack implementation of the Toph dashboard: farm workers record voice logs in
+any language, Toph transcribes them live, extracts the compliance-relevant facts
+(activity, field, chemical, rate, time), and the farmer reviews them here.
 
-First, run the development server:
+**Live demo:** _add your Vercel URL_
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## What's in the box
+
+| Area | Implementation |
+|---|---|
+| Dashboard (the Figma) | Stat cards from real queries, filter/sort/search via URL params, expandable rows with waveform, playback, tags, transcript, satellite map of the field |
+| **Record a log** | Browser mic → Deepgram Nova‑3 live WebSocket → interim transcript → Claude structured extraction → row appears on the dashboard |
+| Multilingual | Auto-detect (code-switching across 10 languages) or pick one of 16. Original transcript is kept; the farmer reads an English translation + summary |
+| Confidence & review | Every log gets a 0–1 confidence and, when low, a `needs_review` flag with a reason. Admin fixes it inline; every edit lands in an audit trail |
+| Map | All fields on satellite imagery, coloured by **restricted-entry interval** (REI) computed from the product label of the last spray |
+| Activity Logs | All logs, status filter, bulk "mark reviewed", CSV export |
+| Performance / Employees | Per-worker log counts, average confidence, flagged count |
+
+## Architecture
+
+```
+Browser
+ ├─ Dashboard (React Server Components + TanStack Query for live refresh)
+ └─ /record
+      ├─ GET /api/deepgram/token   → 60 s access token + farm keyterms (API key never leaves the server)
+      ├─ WSS → Deepgram Live       → interim + final transcripts
+      └─ POST /api/logs/ingest     → audio to Blob storage, transcript to Claude
+                                     (structured output, zod-validated), insert log + applications + audit event
+Next.js 16 (App Router) · Drizzle ORM · Postgres (Docker locally, Neon on Vercel)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Key decisions:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Postgres + Drizzle**, not a document store: applications-per-log, tags, audit
+  events and field geometry are relational. Field polygons are stored as GeoJSON in
+  `jsonb` so Neon's free tier works without PostGIS.
+- **Filters live in the URL.** Every dashboard view is a shareable link and the back
+  button works. Server components render the first paint; TanStack Query polls
+  every 15 s so a log recorded on a phone shows up without a refresh.
+- **Deepgram keyterm prompting.** Product names, active ingredients and field codes
+  from the `products` / `fields` tables are sent as Nova‑3 keyterms, so "atrazine"
+  and "2,4‑D" aren't transcribed as "at your scene" and "two four dee".
+- **Extraction is a typed contract.** `src/lib/extract.ts` defines a zod schema; Claude
+  is asked for that exact shape via structured outputs. If the key is missing or the
+  call fails, a conservative keyword fallback produces a low-confidence, flagged
+  log rather than nothing.
+- **Docker is for local parity, Vercel for hosting.** `docker compose up` gives any
+  reviewer Postgres in one command; the `Dockerfile` proves the app runs anywhere
+  containers do. Vercel deploys the same code with Neon as the database.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run it locally
 
-## Learn More
+```bash
+cp .env.example .env          # add DEEPGRAM_API_KEY and ANTHROPIC_API_KEY
+npm install
+npm run setup                 # docker compose up db → drizzle push → seed
+npm run dev                   # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+Without API keys the dashboard, map and seeded data all work; `/record` falls back
+to a typed transcript and keyword extraction.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Fully containerised: `docker compose --profile app up --build`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy to Vercel
 
-## Deploy on Vercel
+1. Create a Neon database and set `DATABASE_URL` (pooled connection string) in Vercel.
+2. Add `DEEPGRAM_API_KEY`, `ANTHROPIC_API_KEY`. Attach a Blob store (sets `BLOB_READ_WRITE_TOKEN`).
+3. Run the schema + seed once against Neon: `DATABASE_URL=... npm run db:push && npm run db:seed`.
+4. `vercel deploy`. Every PR gets a preview URL.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| | |
+|---|---|
+| `npm run setup` | start Postgres, push schema, seed |
+| `npm run db:seed` | reseed (wipes data) |
+| `npm run db:studio` | Drizzle Studio |
+| `npm run typecheck` / `npm run lint` | |
+
+## Data model
+
+`farms → users (admin/worker) · fields (GeoJSON) · products (REI hours, aliases)`
+`logs → log_applications (product, rate, unit) · log_tags · audit_events`
+
+## Not built (on purpose)
+
+Audit Manager, Reports, Schedule, Messages, Settings and Support are honest stubs
+that describe what they'd do. Auth is a seeded admin — "Switch User" and "Log Out"
+are visual only.
