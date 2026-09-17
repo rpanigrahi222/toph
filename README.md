@@ -4,7 +4,7 @@ Full-stack implementation of the Toph dashboard: farm workers record voice logs 
 any language, Toph transcribes them live, extracts the compliance-relevant facts
 (activity, field, chemical, rate, time), and the farmer reviews them here.
 
-**Live demo:** _add your Vercel URL_
+**Live demo:** https://toph-9b04e3gwr-toph-fcb9aace.vercel.app/
 
 ## What's in the box
 
